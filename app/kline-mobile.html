@@ -87,6 +87,15 @@ b{font-weight:600}
 .quote-refresh:active{background:rgba(245,197,66,.18)}
 .card{background:linear-gradient(180deg,rgba(19,27,40,.94),rgba(11,17,26,.94));
   border:1px solid var(--line);border-radius:14px;padding:15px;margin-bottom:12px}
+.start-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
+.start-acts .primary{grid-column:1/-1;margin:0}
+.start-acts #btnNewRound{grid-column:1/-1}
+.adv{margin-top:14px;padding-top:10px;border-top:1px solid var(--line2)}
+.adv>summary{cursor:pointer;font-size:11.5px;color:#93a1b6;list-style:none;user-select:none}
+.adv>summary::-webkit-details-marker{display:none}
+.adv>summary::before{content:"＋ ";color:#4c8dff}
+.adv[open]>summary::before{content:"－ "}
+.adv[open]>summary{margin-bottom:10px}
 .card-title{font-size:12px;letter-spacing:.08em;color:#b9c7dc;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .card-title::before{content:"";width:3px;height:11px;border-radius:2px;background:linear-gradient(180deg,#4c8dff,#2ebd85)}
 .bh-sub{font-size:10px;color:var(--muted2);font-weight:400;letter-spacing:0}
@@ -468,6 +477,13 @@ tr:last-child td{border-bottom:none}
         <div class="tiny" id="poolInfo">正在加载行情数据…</div>
       </div>
 
+      <div class="start-acts">
+        <button class="primary big" id="btnStart">开始训练</button>
+        <button class="mini" id="btnDaily">今日挑战</button>
+        <button class="mini" id="btnTutorial">新手教程</button>
+        <button class="mini" id="btnNewRound" style="display:none">新开一局</button>
+      </div>
+
       <div class="card">
         <div class="card-title">训练设置</div>
         <div class="field two">
@@ -492,6 +508,8 @@ tr:last-child td{border-bottom:none}
             <button data-v="1">融资融券</button>
           </div>
         </div>
+        <details class="adv">
+          <summary>更多设置（标的 / 指标 / 心理训练）</summary>
         <div class="field two">
           <div>
             <label>指定标的 <span class="muted" style="font-size:11px">留空随机</span></label>
@@ -544,14 +562,10 @@ tr:last-child td{border-bottom:none}
             <div class="tiny" id="seasonInfo" style="margin-top:6px"></div>
           </div>
         </div>
+        </details>
       </div>
 
-      <button class="primary big" id="btnStart">开始训练</button>
-      <button class="mini" id="btnDaily" style="width:100%;margin-top:8px">今日挑战</button>
-      <button class="mini" id="btnNewRound" style="display:none;width:100%;padding:11px 0;margin-bottom:8px">新开一局（放弃当前存档）</button>
-      <button class="mini" id="btnTutorial" style="width:100%;padding:11px 0">新手教程 · 1 分钟上手</button>
-
-      <div class="card" id="iosInstall" style="display:none">
+      <div class="card" id="iosInstall" style="display:none;margin-top:14px">
         <div class="card-title">安装到 iPhone / iPad</div>
         <ol class="ios-steps">
           <li><b>用 Safari 打开</b>本页（微信等内置浏览器不行）</li>
@@ -566,10 +580,12 @@ tr:last-child td{border-bottom:none}
       <div class="card" style="margin-top:14px">
         <div class="card-title">训练记录</div>
         <div class="stat-grid" id="statGrid"></div>
-        <div class="tiny" style="margin:14px 0 8px">分板块表现</div>
-        <div class="recent" id="groupStats" style="max-height:none"></div>
-        <div class="recent" id="recentList"></div>
+        <div class="recent" id="recentList" style="margin-top:12px"></div>
         <div class="tiny" style="margin-top:8px">点击任意记录可回看当时的买卖点、资金曲线与交易流水</div>
+        <details class="adv">
+          <summary>分板块表现</summary>
+          <div class="recent" id="groupStats" style="max-height:none;margin-top:8px"></div>
+        </details>
         <div class="chips-actions" style="margin-top:9px">
           <button class="mini" id="btnExportStats">导出 CSV</button>
           <button class="mini danger" id="btnClearStats">清空记录</button>
@@ -1172,7 +1188,7 @@ function getInd(sym) {
 }
 
 /* ================= 设置与记录 ================= */
-const APP_VER = '1.13.0';
+const APP_VER = '1.13.1';
 const BUILD_DATE = '2026-11-10';
 const GROUPS = [
   { key: '沪市主板', label: '沪主板' },

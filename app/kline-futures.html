@@ -87,6 +87,14 @@ input:focus,select:focus{border-color:rgba(76,141,255,.6)}
   color:#fff;font-weight:600;font-size:14.5px;box-shadow:0 8px 22px rgba(63,109,240,.28)}
 .mini{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:#0d131d;color:#93a1b6;font-size:12px}
 .mini.danger{color:#ff8e9e;border-color:rgba(246,70,93,.28);background:rgba(246,70,93,.08)}
+.start-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 4px}
+.start-acts .primary{grid-column:1/-1}
+.adv{margin-top:14px;padding-top:10px;border-top:1px solid var(--line2)}
+.adv>summary{cursor:pointer;font-size:11.5px;color:#93a1b6;list-style:none;user-select:none}
+.adv>summary::-webkit-details-marker{display:none}
+.adv>summary::before{content:"＋ ";color:#4c8dff}
+.adv[open]>summary::before{content:"－ "}
+.adv[open]>summary{margin-bottom:10px}
 .tiny{color:var(--muted2);font-size:11px;line-height:1.7;margin-top:9px}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:13px}
 .stat{background:#0c121b;border:1px solid var(--line2);border-radius:10px;padding:10px 12px}
@@ -311,6 +319,12 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
             <div><label>初始资金</label><input id="inpCap" type="number" min="3000" step="10000" value="500000" inputmode="numeric"></div>
             <div><label>默认手数</label><input id="inpLots" type="number" min="1" step="1" value="1" inputmode="numeric"></div>
           </div>
+          <div class="start-acts">
+            <button class="primary" id="btnStart">开始训练</button>
+            <button class="mini" id="btnDaily">今日挑战</button>
+          </div>
+          <details class="adv">
+            <summary>更多设置（费用 / 合约 / 指标 / 心理训练）</summary>
           <div class="field">
             <label>心理训练</label>
             <div class="checks">
@@ -358,8 +372,7 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
               </div>
             </div>
           </div>
-          <button class="primary" id="btnStart">开始训练</button>
-          <button class="mini" id="btnDaily" style="width:100%;margin-top:8px">今日挑战</button>
+          </details>
           <div class="tiny" id="dataMeta"></div>
           <div class="tiny">项目地址：<a id="lnkGitHub" href="https://github.com/MINGRENC0/genius-trader-simulator" target="_blank" rel="noopener" style="color:#4c8dff;text-decoration:none">GitHub</a> · 许可证 PolyForm Noncommercial 1.0.0（禁止商用）</div>
         </div>
@@ -586,7 +599,7 @@ function toast(msg) {
 }
 
 const SET_KEY = 'klineFutSettings';
-const APP_VER = '1.13.0';
+const APP_VER = '1.13.1';
 const STAT_KEY = 'klineFutStats';
 const SEASON_HIST_KEY = 'klineFutSeasonHist';
 const TUT_KEY = 'klineFutTutDone';
