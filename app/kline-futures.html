@@ -359,6 +359,7 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
             </div>
           </div>
           <button class="primary" id="btnStart">开始训练</button>
+          <button class="mini" id="btnDaily" style="width:100%;margin-top:8px">今日挑战</button>
           <div class="tiny" id="dataMeta"></div>
           <div class="tiny">项目地址：<a id="lnkGitHub" href="https://github.com/MINGRENC0/genius-trader-simulator" target="_blank" rel="noopener" style="color:#4c8dff;text-decoration:none">GitHub</a> · 许可证 PolyForm Noncommercial 1.0.0（禁止商用）</div>
         </div>
@@ -383,6 +384,7 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
       <div class="round-meta" id="roundMeta"></div>
       <span class="blind">盲测</span>
       <div class="spacer"></div>
+      <button class="mini" id="btnAuto">自动</button>
       <button class="mini" id="btnNews">消息</button>
       <button class="mini" id="btnEnd">结束</button>
       <div class="progress" id="progBar"></div>
@@ -497,6 +499,10 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
         <p id="sumRange">—</p>
       </div>
       <div class="metrics" id="metricGrid"></div>
+      <div class="card" id="ratingCard" style="margin-top:14px">
+        <div class="ct">本局评级与成就</div>
+        <div id="ratingBox"></div>
+      </div>
       <div class="card" style="margin-top:14px">
         <div class="ct">K线复盘 · 买卖点还原</div>
         <canvas id="sumChart"></canvas>
@@ -504,6 +510,10 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
       <div class="card" style="margin-top:14px">
         <div class="ct">资金曲线 vs 标的涨跌</div>
         <canvas id="eqChart"></canvas>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="ct">每日结算</div>
+        <div class="table-wrap" id="dailyTable"></div>
       </div>
       <div class="card" id="seasonCard" style="margin-top:14px;display:none">
         <div class="ct">连续赛季</div>
@@ -576,6 +586,7 @@ function toast(msg) {
 }
 
 const SET_KEY = 'klineFutSettings';
+const APP_VER = '1.13.0';
 const STAT_KEY = 'klineFutStats';
 const SEASON_HIST_KEY = 'klineFutSeasonHist';
 const TUT_KEY = 'klineFutTutDone';
@@ -641,6 +652,48 @@ function renderSeasonHist() {
 }
 const WARMUP = 60, LEN = 300, VIEW = 120;
 const S = { hover: -1 };
+let AUTO = 0, autoTimer = null;
+const DAILY_KEY = 'klineFutDaily';
+const F_DAILY = { key: null, code: null };
+function dayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function hashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function dailyResult() {
+  try { return JSON.parse(localStorage.getItem(DAILY_KEY) || 'null'); } catch (e) { return null; }
+}
+function updateDailyBtn() {
+  const b = $('#btnDaily');
+  if (!b) return;
+  const d = dailyResult();
+  b.textContent = (d && d.date === dayKey()) ? '今日挑战已完成 ' + pct(d.ret) : '今日挑战 · ' + dayKey();
+}
+function checkUpdate() {
+  function newerVer(a, b) {
+    const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] || 0) > (pb[i] || 0)) return true;
+      if ((pa[i] || 0) < (pb[i] || 0)) return false;
+    }
+    return false;
+  }
+  fetch('https://api.github.com/repos/MINGRENC0/genius-trader-simulator/releases/latest', {
+    headers: { Accept: 'application/vnd.github+json' }
+  }).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j) return;
+    const tag = String(j.tag_name || '').replace(/^v/, '');
+    if (!tag || !newerVer(tag, APP_VER)) return;
+    if (confirm('发现新版本 v' + tag + '（当前 ' + APP_VER + '），是否打开下载页面？')) {
+      window.open(j.html_url, '_blank', 'noopener');
+    }
+  }).catch(() => { });
+}
+setTimeout(checkUpdate, 3000);
 let PK_DIR = 'long';
 let PK_MODE = 'market';
 
@@ -975,6 +1028,18 @@ function afterTrade() {
   KC_FUT.saveRound(R);
 }
 
+function stopAuto() {
+  AUTO = 0;
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  syncAutoBtn();
+}
+function syncAutoBtn() {
+  const b = $('#btnAuto');
+  if (!b) return;
+  b.textContent = AUTO ? AUTO + 'x 自动' : '自动';
+  b.classList.toggle('on', !!AUTO);
+}
+
 function advance() {
   if (!R || R.finished) return;
   if (R.cur >= R.end) return finishRound();
@@ -1013,9 +1078,10 @@ function syncEquity() {
 
 /* ================= 渲染 ================= */
 function showScreen(name) {
+  if (name !== 'train') stopAuto();
   if (name !== 'train') closeSidePanel();
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
-  if (name === 'start') { renderStats(); syncChartSettings(); }
+  if (name === 'start') { renderStats(); syncChartSettings(); updateDailyBtn(); }
   if (name === 'train') requestAnimationFrame(() => { resize(); drawChart(); });
 }
 function renderTrain() {
@@ -1248,6 +1314,7 @@ function submitPending() {
 
 /* ================= 结算 ================= */
 function finishRound() {
+  stopAuto();
   if (!R || R.finished) return;
   R.finished = true;
   syncEquity();
@@ -1291,6 +1358,10 @@ function finishRound() {
   STATS.push(rec);
   if (STATS.length > 100) STATS.shift();
   saveStats();
+  if (F_DAILY.key === dayKey() && rec.code === F_DAILY.code) {
+    try { localStorage.setItem(DAILY_KEY, JSON.stringify({ date: F_DAILY.key, ret: rec.ret, code: rec.code, name: rec.name })); } catch (e) { }
+    F_DAILY.key = null; F_DAILY.code = null;
+  }
   KC_FUT.clearRound();
   showScreen('summary');
   renderSummary(rec);
@@ -1343,6 +1414,8 @@ function renderSummary(rec) {
   });
   drawEqChart(rec);
   drawSumK(rec);
+  renderRating(rec);
+  renderDaily(rec);
   renderBehavior(rec);
   renderRumors(rec);
   renderSeasonCard(rec);
@@ -1468,6 +1541,124 @@ function drawEqChart(rec) {
   ctx.fillText('策略 ' + pct(rec.ret), padL, padT + 10);
   ctx.fillStyle = '#8a97aa';
   ctx.fillText('标的 ' + pct(rec.bh), padL + 90, padT + 10);
+}
+
+function renderRating(rec) {
+  const box = $('#ratingBox');
+  if (!box) return;
+  const score = (rec.excess || 0) * 100 - Math.abs(rec.mdd || 0) * 60;
+  const grade = score >= 15 ? 'S' : score >= 8 ? 'A' : score >= 3 ? 'B' : score >= 0 ? 'C' : 'D';
+  const gcls = (grade === 'S' || grade === 'A') ? 'pos' : (grade === 'D' ? 'neg' : '');
+  const badges = [];
+  if (rec.ret > 0) badges.push('首胜');
+  if (rec.mdd > -0.05) badges.push('回撤控制');
+  if (rec.winRate != null && rec.winRate >= 0.6 && rec.closed >= 3) badges.push('高胜率');
+  let streak = 0;
+  for (let i = STATS.length - 2; i >= 0 && STATS[i].ret > 0; i--) streak++;
+  if (streak >= 2) badges.push((streak + 1) + ' 连胜');
+  if (!badges.length) badges.push('继续修炼');
+  box.innerHTML = '<div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">' +
+    '<div class="' + gcls + '" style="font-size:42px;font-weight:700;line-height:1">' + grade + '</div>' +
+    '<div style="flex:1"><div style="font-size:12px;color:#8a97aa">综合评级（超额收益 − 回撤惩罚）</div>' +
+    '<div style="font-size:12px;color:#c6d3e6;margin-top:3px">评分 ' + score.toFixed(1) + '</div></div>' +
+    '<button class="mini" id="btnShare">生成战绩卡</button></div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px">' + badges.map(b =>
+      '<span style="font-size:10.5px;color:#cfe0ff;border:1px solid rgba(76,141,255,.35);' +
+      'background:rgba(76,141,255,.1);border-radius:999px;padding:3px 9px">' + b + '</span>').join('') + '</div>';
+  const btn = $('#btnShare');
+  if (btn) btn.onclick = () => showShareCard(rec, grade, badges);
+}
+
+function renderDaily(rec) {
+  const box = $('#dailyTable');
+  if (!box) return;
+  const sym = ALL.find(s => s.code === rec.code);
+  if (!sym || !sym.bars) { box.innerHTML = '<div class="side-empty">缺少行情，无法生成结算单。</div>'; return; }
+  const src = (R && R.sym && R.sym.code === rec.code && R.cur === rec.ei && R.curve && R.curve.length > 2)
+    ? R.curve : (rec.eq || []);
+  if (!src.length) { box.innerHTML = '<div class="side-empty">本局没有权益记录。</div>'; return; }
+  let prev = rec.initial;
+  const rows = src.map(p => {
+    const diff = p.eq - prev;
+    prev = p.eq;
+    return { d: sym.bars[p.i] ? sym.bars[p.i].d : '', eq: p.eq, diff: diff };
+  });
+  const show = rows.slice(-40).reverse();
+  box.innerHTML = '<table><thead><tr><th>日期</th><th>权益</th><th>当日盈亏</th><th>累计</th></tr></thead><tbody>' +
+    show.map(x => '<tr><td>' + x.d + '</td><td>' + money(x.eq) + '</td><td class="' + cls(x.diff) + '">' +
+      moneySigned(x.diff) + '</td><td class="' + cls(x.eq / rec.initial - 1) + '">' + pct(x.eq / rec.initial - 1) +
+      '</td></tr>').join('') + '</tbody></table>';
+}
+
+function showShareCard(rec, grade, badges) {
+  const old = $('#cardMask');
+  if (old) old.remove();
+  const c = document.createElement('canvas');
+  c.width = 720; c.height = 1000;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, 1000);
+  g.addColorStop(0, '#0d1524'); g.addColorStop(1, '#070a10');
+  x.fillStyle = g; x.fillRect(0, 0, 720, 1000);
+  x.fillStyle = '#4c8dff'; x.fillRect(0, 0, 720, 6);
+  x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+  x.fillStyle = '#e7eef8'; x.font = '700 36px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText('天才交易员模拟器', 48, 82);
+  x.fillStyle = '#8a97aa'; x.font = '20px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText('期货 · 历史日 K 盲测交易', 48, 116);
+  x.fillStyle = grade === 'D' ? '#f6465d' : '#63e0b0';
+  x.font = '700 130px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText(grade, 48, 270);
+  x.fillStyle = rec.ret >= 0 ? '#f6465d' : '#2ebd85';
+  x.font = '700 60px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText(pct(rec.ret), 48, 370);
+  x.fillStyle = '#8a97aa'; x.font = '20px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText(rec.name + ' · ' + rec.code, 48, 408);
+  x.fillText(rec.start + ' → ' + rec.end + '　' + (rec.ei - rec.si + 1) + ' 根日 K', 48, 440);
+  const lines = [
+    ['本金', money(rec.initial)],
+    ['超额收益', pct(rec.excess)],
+    ['最大回撤', (rec.mdd * 100).toFixed(1) + '%'],
+    ['胜率', rec.winRate == null ? '—' : (rec.winRate * 100).toFixed(0) + '%'],
+    ['交易笔数', rec.orders + ' 笔']
+  ];
+  x.font = '22px -apple-system,"Microsoft YaHei",sans-serif';
+  lines.forEach((it, i) => {
+    const yy = 505 + i * 42;
+    x.fillStyle = '#8a97aa'; x.fillText(it[0], 48, yy);
+    x.fillStyle = '#dfe8f5'; x.textAlign = 'right'; x.fillText(it[1], 672, yy); x.textAlign = 'left';
+  });
+  const vals = (rec.eq || []).map(p => p.eq);
+  if (vals.length > 1) {
+    let hi = Math.max.apply(null, vals), lo = Math.min.apply(null, vals);
+    const pad = (hi - lo) * 0.15 || 1; hi += pad; lo -= pad;
+    const X = i => 48 + i / (vals.length - 1) * 624;
+    const Y = v => 760 + (hi - v) / (hi - lo) * 130;
+    x.strokeStyle = rec.ret >= 0 ? '#f6465d' : '#2ebd85'; x.lineWidth = 3;
+    x.beginPath();
+    vals.forEach((v, i) => { i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); });
+    x.stroke();
+    x.setLineDash([5, 5]); x.strokeStyle = 'rgba(138,151,170,.5)'; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(48, Y(rec.initial)); x.lineTo(672, Y(rec.initial)); x.stroke();
+    x.setLineDash([]);
+  }
+  x.font = '20px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillStyle = '#cfe0ff';
+  x.fillText(badges.join(' · '), 48, 930);
+  x.fillStyle = '#5f6d80'; x.font = '16px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText('github.com/MINGRENC0/genius-trader-simulator', 48, 968);
+  const url = c.toDataURL('image/png');
+  const m = document.createElement('div');
+  m.id = 'cardMask';
+  m.style.cssText = 'position:fixed;inset:0;z-index:9996;background:rgba(3,6,10,.86);display:flex;' +
+    'align-items:center;justify-content:center;padding:16px';
+  m.innerHTML = '<div style="max-width:360px;width:100%;text-align:center">' +
+    '<img src="' + url + '" style="width:100%;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.6)">' +
+    '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px">' +
+    '<a class="mini" download="genius-trader-card.png" href="' + url + '" style="text-decoration:none">保存图片</a>' +
+    '<button class="mini" id="cardClose">关闭</button></div>' +
+    '<div class="tiny" style="margin-top:8px">手机可长按图片保存</div></div>';
+  document.body.appendChild(m);
+  m.querySelector('#cardClose').onclick = () => m.remove();
 }
 
 function drawSumK(rec) {
@@ -2196,6 +2387,24 @@ function bind() {
     saveSettings();
     startRound();
   };
+  $('#btnDaily').onclick = () => {
+    if (R && !R.finished && !confirm('开始今日挑战将放弃当前对局，确定？')) return;
+    const cap = SET.capital;
+    const pool = ALL.filter(s => s.bars && s.bars.length >= WARMUP + 120);
+    if (!pool.length) return toast('没有可用的每日挑战合约');
+    const key = dayKey();
+    const off = hashStr('fut-' + key) % pool.length;
+    for (let k = 0; k < pool.length; k++) {
+      const s = pool[(off + k) % pool.length];
+      const maxStart = s.bars.length - 120;
+      const st = WARMUP + hashStr('fstart-' + key + s.code) % Math.max(1, maxStart - WARMUP + 1);
+      if (s.bars[st].c * s.mul * s.mr > cap) continue;
+      F_DAILY.key = key; F_DAILY.code = s.code;
+      startAt(s, st, 120, cap);
+      return;
+    }
+    toast('当前资金下没有可用的每日挑战合约');
+  };
   $('#btnQuit').onclick = () => {
     KC_FUT.saveRound(R);
     showScreen('start');
@@ -2224,6 +2433,18 @@ function bind() {
     toast('已撤销 ' + n + ' 笔挂单');
   };
   $('#btnNext').onclick = () => advance();
+  $('#btnAuto').onclick = () => {
+    if (!R || R.finished) return;
+    AUTO = AUTO === 0 ? 1 : (AUTO === 1 ? 2 : (AUTO === 2 ? 4 : 0));
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    if (AUTO) {
+      autoTimer = setInterval(() => {
+        if (!R || R.finished) return stopAuto();
+        advance();
+      }, AUTO === 1 ? 1100 : (AUTO === 2 ? 550 : 280));
+    }
+    syncAutoBtn();
+  };
   $('#btnAgain').onclick = () => { R = null; startRound(); };
   $('#btnSame').onclick = () => {
     if (!SUM_ROUND) return;

@@ -547,6 +547,7 @@ tr:last-child td{border-bottom:none}
       </div>
 
       <button class="primary big" id="btnStart">开始训练</button>
+      <button class="mini" id="btnDaily" style="width:100%;margin-top:8px">今日挑战</button>
       <button class="mini" id="btnNewRound" style="display:none;width:100%;padding:11px 0;margin-bottom:8px">新开一局（放弃当前存档）</button>
       <button class="mini" id="btnTutorial" style="width:100%;padding:11px 0">新手教程 · 1 分钟上手</button>
 
@@ -684,6 +685,7 @@ tr:last-child td{border-bottom:none}
       <div class="round-meta" id="roundMeta"></div>
       <span class="blind">盲测</span>
       <div class="spacer"></div>
+      <button class="mini" id="btnAuto">自动</button>
       <button class="mini news-btn" id="btnNews">消息<span class="news-badge hide" id="newsBadge">0</span></button>
       <button class="icon-btn" id="btnMore" aria-label="详情">⋯</button>
       <div class="progress" id="progBar"></div>
@@ -753,6 +755,10 @@ tr:last-child td{border-bottom:none}
         <div id="sumRange">—</div>
       </div>
       <div class="metric-grid" id="metricGrid"></div>
+      <div class="card" id="ratingCard">
+        <div class="card-title">本局评级与成就</div>
+        <div id="ratingBox"></div>
+      </div>
       <div class="card eq-card">
         <div class="card-title">资金曲线 vs 买入不动</div>
         <div class="eq-legend">
@@ -785,6 +791,10 @@ tr:last-child td{border-bottom:none}
       <div class="card" id="rumorCard" style="display:none">
         <div class="card-title">传闻复盘 <span class="bh-sub">本局传闻真伪揭晓</span></div>
         <div class="table-wrap" id="rumorTable"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">每日结算</div>
+        <div class="table-wrap" id="dailyTable"></div>
       </div>
       <div class="card">
         <div class="card-title">交易流水</div>
@@ -1162,7 +1172,7 @@ function getInd(sym) {
 }
 
 /* ================= 设置与记录 ================= */
-const APP_VER = '1.12.0';
+const APP_VER = '1.13.0';
 const BUILD_DATE = '2026-11-10';
 const GROUPS = [
   { key: '沪市主板', label: '沪主板' },
@@ -1253,6 +1263,48 @@ const S = {
   period: 'D',
   marginUse: 'N'
 };
+let AUTO = 0, autoTimer = null;
+const DAILY_KEY = 'klineCampDaily';
+const DAILY = { key: null, code: null };
+function dayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function hashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function dailyResult() {
+  try { return JSON.parse(localStorage.getItem(DAILY_KEY) || 'null'); } catch (e) { return null; }
+}
+function updateDailyBtn() {
+  const b = $('#btnDaily');
+  if (!b) return;
+  const d = dailyResult();
+  b.textContent = (d && d.date === dayKey()) ? '今日挑战已完成 ' + pctFmt(d.ret) : '今日挑战 · ' + dayKey();
+}
+function checkUpdate() {
+  function newerVer(a, b) {
+    const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] || 0) > (pb[i] || 0)) return true;
+      if ((pa[i] || 0) < (pb[i] || 0)) return false;
+    }
+    return false;
+  }
+  fetch('https://api.github.com/repos/MINGRENC0/genius-trader-simulator/releases/latest', {
+    headers: { Accept: 'application/vnd.github+json' }
+  }).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j) return;
+    const tag = String(j.tag_name || '').replace(/^v/, '');
+    if (!tag || !newerVer(tag, APP_VER)) return;
+    if (confirm('发现新版本 v' + tag + '（当前 ' + APP_VER + '），是否打开下载页面？')) {
+      window.open(j.html_url, '_blank', 'noopener');
+    }
+  }).catch(() => { });
+}
+setTimeout(checkUpdate, 3000);
 
 /* ================= 图表 ================= */
 const chart = {
@@ -2372,6 +2424,18 @@ function readQty(step) {
   return n > 0 ? n : 0;
 }
 
+function stopAuto() {
+  AUTO = 0;
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  syncAutoBtn();
+}
+function syncAutoBtn() {
+  const b = $('#btnAuto');
+  if (!b) return;
+  b.textContent = AUTO ? AUTO + 'x 自动' : '自动';
+  b.classList.toggle('on', !!AUTO);
+}
+
 function advance() {
   const r = S.round;
   if (!r || r.finished) return;
@@ -2424,6 +2488,7 @@ function pendingMsg(trig) {
 }
 
 function finishRound() {
+  stopAuto();
   const r = S.round;
   if (!r || r.finished) return;
   r.finished = true;
@@ -2494,6 +2559,10 @@ function finishRound() {
   STATS.push(rec);
   if (STATS.length > 300) STATS.shift();
   saveStats();
+  if (DAILY.key === dayKey() && rec.code === DAILY.code) {
+    try { localStorage.setItem(DAILY_KEY, JSON.stringify({ date: DAILY.key, ret: rec.ret, code: rec.code, name: rec.name })); } catch (e) { }
+    DAILY.key = null; DAILY.code = null;
+  }
   clearRound();
   closeSheet();
   renderSummary(r, rec);
@@ -3243,6 +3312,8 @@ function renderSummary(r, rec) {
   renderSeason(rec);
   renderBehavior(rec);
   renderRumorReview(r, rec);
+  renderRating(rec);
+  renderDaily(rec);
 
   requestAnimationFrame(() => {
     drawEqChart($('#eqChart'), r);
@@ -3365,6 +3436,124 @@ async function openRecord(rec) {
   renderSummary(r, rec);
   $('#sumRange').textContent += '　· 历史记录';
   showScreen('summary');
+}
+
+function renderRating(rec) {
+  const box = $('#ratingBox');
+  if (!box) return;
+  const score = (rec.excess || 0) * 100 - Math.abs(rec.mdd || 0) * 60;
+  const grade = score >= 15 ? 'S' : score >= 8 ? 'A' : score >= 3 ? 'B' : score >= 0 ? 'C' : 'D';
+  const gcls = (grade === 'S' || grade === 'A') ? 'pos' : (grade === 'D' ? 'neg' : '');
+  const badges = [];
+  if (rec.ret > 0) badges.push('首胜');
+  if (rec.mdd > -0.05) badges.push('回撤控制');
+  if (rec.winRate != null && rec.winRate >= 0.6 && rec.closed >= 3) badges.push('高胜率');
+  let streak = 0;
+  for (let i = STATS.length - 2; i >= 0 && STATS[i].ret > 0; i--) streak++;
+  if (streak >= 2) badges.push((streak + 1) + ' 连胜');
+  if (!badges.length) badges.push('继续修炼');
+  box.innerHTML = '<div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">' +
+    '<div class="' + gcls + '" style="font-size:42px;font-weight:700;line-height:1">' + grade + '</div>' +
+    '<div style="flex:1"><div style="font-size:12px;color:#8a97aa">综合评级（超额收益 − 回撤惩罚）</div>' +
+    '<div style="font-size:12px;color:#c6d3e6;margin-top:3px">评分 ' + score.toFixed(1) + '</div></div>' +
+    '<button class="mini" id="btnShare">生成战绩卡</button></div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px">' + badges.map(b =>
+      '<span style="font-size:10.5px;color:#cfe0ff;border:1px solid rgba(76,141,255,.35);' +
+      'background:rgba(76,141,255,.1);border-radius:999px;padding:3px 9px">' + b + '</span>').join('') + '</div>';
+  const btn = $('#btnShare');
+  if (btn) btn.onclick = () => showShareCard(rec, grade, badges);
+}
+
+function renderDaily(rec) {
+  const box = $('#dailyTable');
+  if (!box) return;
+  const r = SUM_ROUND;
+  const bars = (r && r.sym && r.sym.code === rec.code) ? r.sym.bars : null;
+  const src = (r && r.sym && r.sym.code === rec.code && r.cur === rec.ei && r.curve && r.curve.length > 2)
+    ? r.curve : (rec.eq || []);
+  if (!src.length) { box.innerHTML = '<div class="empty">本局没有权益记录。</div>'; return; }
+  let prev = rec.initial;
+  const rows = src.map(p => {
+    const diff = p.eq - prev;
+    prev = p.eq;
+    return { d: bars && bars[p.i] ? bars[p.i].d : '—', eq: p.eq, diff: diff };
+  });
+  const show = rows.slice(-40).reverse();
+  box.innerHTML = '<table><thead><tr><th>日期</th><th>权益</th><th>当日盈亏</th><th>累计</th></tr></thead><tbody>' +
+    show.map(x => '<tr><td>' + x.d + '</td><td>' + moneyFmt(x.eq) + '</td><td class="' + cls(x.diff) + '">' +
+      (x.diff >= 0 ? '+' : '') + x.diff.toFixed(2) + '</td><td class="' + cls(x.eq / rec.initial - 1) + '">' +
+      pctFmt(x.eq / rec.initial - 1) + '</td></tr>').join('') + '</tbody></table>';
+}
+
+function showShareCard(rec, grade, badges) {
+  const old = $('#cardMask');
+  if (old) old.remove();
+  const c = document.createElement('canvas');
+  c.width = 720; c.height = 1000;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, 1000);
+  g.addColorStop(0, '#0d1524'); g.addColorStop(1, '#070a10');
+  x.fillStyle = g; x.fillRect(0, 0, 720, 1000);
+  x.fillStyle = '#4c8dff'; x.fillRect(0, 0, 720, 6);
+  x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+  x.fillStyle = '#e7eef8'; x.font = '700 36px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText('天才交易员模拟器', 48, 82);
+  x.fillStyle = '#8a97aa'; x.font = '20px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText('A股 · 历史日 K 盲测交易', 48, 116);
+  x.fillStyle = grade === 'D' ? '#f6465d' : '#63e0b0';
+  x.font = '700 130px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText(grade, 48, 270);
+  x.fillStyle = rec.ret >= 0 ? '#f6465d' : '#2ebd85';
+  x.font = '700 60px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText(pctFmt(rec.ret), 48, 370);
+  x.fillStyle = '#8a97aa'; x.font = '20px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText(rec.name + ' · ' + rec.code, 48, 408);
+  x.fillText(rec.start + ' → ' + rec.end + '　' + rec.bars + ' 根日 K', 48, 440);
+  const lines = [
+    ['本金', moneyFmt(rec.initial)],
+    ['超额收益', pctFmt(rec.excess)],
+    ['最大回撤', (rec.mdd * 100).toFixed(1) + '%'],
+    ['胜率', rec.winRate == null ? '—' : (rec.winRate * 100).toFixed(0) + '%'],
+    ['交易笔数', rec.orders + ' 笔']
+  ];
+  x.font = '22px -apple-system,"Microsoft YaHei",sans-serif';
+  lines.forEach((it, i) => {
+    const yy = 505 + i * 42;
+    x.fillStyle = '#8a97aa'; x.fillText(it[0], 48, yy);
+    x.fillStyle = '#dfe8f5'; x.textAlign = 'right'; x.fillText(it[1], 672, yy); x.textAlign = 'left';
+  });
+  const vals = (rec.eq || []).map(p => p.eq);
+  if (vals.length > 1) {
+    let hi = Math.max.apply(null, vals), lo = Math.min.apply(null, vals);
+    const pad = (hi - lo) * 0.15 || 1; hi += pad; lo -= pad;
+    const X = i => 48 + i / (vals.length - 1) * 624;
+    const Y = v => 760 + (hi - v) / (hi - lo) * 130;
+    x.strokeStyle = rec.ret >= 0 ? '#f6465d' : '#2ebd85'; x.lineWidth = 3;
+    x.beginPath();
+    vals.forEach((v, i) => { i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); });
+    x.stroke();
+    x.setLineDash([5, 5]); x.strokeStyle = 'rgba(138,151,170,.5)'; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(48, Y(rec.initial)); x.lineTo(672, Y(rec.initial)); x.stroke();
+    x.setLineDash([]);
+  }
+  x.font = '20px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillStyle = '#cfe0ff';
+  x.fillText(badges.join(' · '), 48, 930);
+  x.fillStyle = '#5f6d80'; x.font = '16px -apple-system,"Microsoft YaHei",sans-serif';
+  x.fillText('github.com/MINGRENC0/genius-trader-simulator', 48, 968);
+  const url = c.toDataURL('image/png');
+  const m = document.createElement('div');
+  m.id = 'cardMask';
+  m.style.cssText = 'position:fixed;inset:0;z-index:9996;background:rgba(3,6,10,.86);display:flex;' +
+    'align-items:center;justify-content:center;padding:16px';
+  m.innerHTML = '<div style="max-width:360px;width:100%;text-align:center">' +
+    '<img src="' + url + '" style="width:100%;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.6)">' +
+    '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px">' +
+    '<a class="mini" download="genius-trader-card.png" href="' + url + '" style="text-decoration:none">保存图片</a>' +
+    '<button class="mini" id="cardClose">关闭</button></div>' +
+    '<div class="tiny" style="margin-top:8px">手机可长按图片保存</div></div>';
+  document.body.appendChild(m);
+  m.querySelector('#cardClose').onclick = () => m.remove();
 }
 
 function drawTradeChart(canvas, r) {
@@ -3802,6 +3991,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function showScreen(name) {
+  if (name !== 'train') stopAuto();
   if (name !== 'train') closeNews();
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
   if (name === 'train' || name === 'summary' || name === 'settings') pushGuard();
@@ -3816,6 +4006,7 @@ function showScreen(name) {
     if (btn) btn.textContent = (S.round && !S.round.finished) ? '继续训练' : '开始训练';
     const nb = $('#btnNewRound');
     if (nb) nb.style.display = (S.round && !S.round.finished) ? 'block' : 'none';
+    updateDailyBtn();
   }
 }
 
@@ -4034,6 +4225,20 @@ function bindEvents() {
     }
     await startRound();
   };
+  $('#btnDaily').onclick = async () => {
+    if (S.round && !S.round.finished && !confirm('开始今日挑战将放弃当前对局，确定？')) return;
+    const need = WARMUP + 120;
+    const cap = SET.capital;
+    const pool = RAW.filter(s => s.k >= need && (cap >= CAP_GATE || GATED_GROUPS.indexOf(s.cat) < 0) &&
+      (!(s.lo > 0) || s.lo * KC.lotRule(s).min <= cap));
+    if (!pool.length) return toast('当前资金下没有可用的每日挑战标的');
+    const key = dayKey();
+    const sym = pool[hashStr('kline-' + key) % pool.length];
+    const start = WARMUP + hashStr('start-' + key + sym.code) % Math.max(1, sym.k - 120 - WARMUP + 1);
+    DAILY.key = key; DAILY.code = sym.code;
+    await startRound({ sym: sym, start: start, len: 120 });
+    if (!S.round || S.round.sym.code !== sym.code || S.round.start !== start) { DAILY.key = null; DAILY.code = null; }
+  };
   $('#inpPick').onchange = () => { SET.pick = ($('#inpPick').value || '').trim(); saveSettings(); renderPoolInfo(); };
   $('#selYear').onchange = () => { SET.year = $('#selYear').value || ''; saveSettings(); renderPoolInfo(); };
   $('#inpCapital').onchange = () => {
@@ -4146,6 +4351,18 @@ function bindEvents() {
   };
   $('#btnSell').onclick = () => trade('S');
   $('#btnNext').onclick = () => advance();
+  $('#btnAuto').onclick = () => {
+    if (!S.round || S.round.finished) return;
+    AUTO = AUTO === 0 ? 1 : (AUTO === 1 ? 2 : (AUTO === 2 ? 4 : 0));
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    if (AUTO) {
+      autoTimer = setInterval(() => {
+        if (!S.round || S.round.finished) return stopAuto();
+        advance();
+      }, AUTO === 1 ? 1100 : (AUTO === 2 ? 550 : 280));
+    }
+    syncAutoBtn();
+  };
   const qtyEl = $('#inpQty');
   if (qtyEl) qtyEl.addEventListener('input', updateTradeLabels);
   $$('#segFracLive button').forEach(b => {

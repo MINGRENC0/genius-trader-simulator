@@ -86,7 +86,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String version() {
-            return "1.12.0";
+            return "1.13.0";
         }
 
         /** 用系统浏览器打开外部链接，避免把 WebView 导航出应用。 */
