@@ -1,7 +1,9 @@
 package com.klinecamp.app;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
@@ -85,6 +87,17 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String version() {
             return "1.9.0";
+        }
+
+        /** 用系统浏览器打开外部链接，避免把 WebView 导航出应用。 */
+        @JavascriptInterface
+        public void openUrl(String url) {
+            try {
+                Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+            } catch (Exception ignored) {
+            }
         }
     }
 

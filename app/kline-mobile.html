@@ -667,6 +667,12 @@ tr:last-child td{border-bottom:none}
         <div class="tiny" id="setVersionNote">指标：均线 / BOLL / 神奇九转（主图）；成交量 / MACD / KDJ / RSI / 筹码（副图）</div>
       </div>
 
+      <div class="card">
+        <div class="card-title">关于</div>
+        <div class="kv"><span>项目地址</span><b><a id="lnkGitHub" href="https://github.com/MINGRENC0/genius-trader-simulator" target="_blank" rel="noopener" style="color:#4c8dff;text-decoration:none;word-break:break-all">github.com/MINGRENC0/genius-trader-simulator</a></b></div>
+        <div class="kv"><span>许可证</span><b>PolyForm Noncommercial 1.0.0（禁止商用）</b></div>
+      </div>
+
       <div class="tiny">训练记录只保存在本机浏览器，清缓存或换设备会丢失，建议定期导出备份。</div>
     </div>
   </section>
@@ -4179,6 +4185,13 @@ function bindEvents() {
     $('#btnRules').classList.toggle('on', p.classList.contains('show'));
   };
   $('#btnSettingsBack').onclick = goHome;
+  const ghLink = $('#lnkGitHub');
+  if (ghLink) ghLink.onclick = e => {
+    e.preventDefault();
+    const url = ghLink.getAttribute('href');
+    if (window.KlineApp && window.KlineApp.openUrl) { window.KlineApp.openUrl(url); return; }
+    window.open(url, '_blank', 'noopener');
+  };
   const onFeeChange = () => {
     const c = clamp(Number($('#setComm').value) / 100, 0, 0.01);
     const m = clamp(Number($('#setMinFee').value), 0, 100);

@@ -1,5 +1,5 @@
 /* 天才交易员模拟器 · 离线缓存 */
-const CACHE = 'genius-trader-v38';
+const CACHE = 'genius-trader-v39';
 const SHELL = ['./app/kline-mobile.html', './app/kline-core.js', './data/kline-index.js', './data/kline-fundamentals.js',
   './data/kline-news.js', './data/kline-news-index.js', './app/kline-futures.html', './app/kline-futures-core.js',
   './data/kline-fut-data.js', './app/manifest.webmanifest', './app/icons/icon-192.png'];

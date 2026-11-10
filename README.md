@@ -41,3 +41,12 @@ python build/build_exe.py   # → dist/K线训练营.exe
 - 期货：`data/kline-fut-data.js`
 
 行情与消息均按代码懒加载，断网可用；离线消息为各标的近期公告与新闻，不是全历史。
+
+## 项目地址
+
+https://github.com/MINGRENC0/genius-trader-simulator
+
+## 许可证
+
+本项目采用 [PolyForm Noncommercial 1.0.0](LICENSE)：允许个人学习、研究与非商业用途，**禁止任何商业用途**。
+

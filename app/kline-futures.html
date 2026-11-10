@@ -360,6 +360,7 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
           </div>
           <button class="primary" id="btnStart">开始训练</button>
           <div class="tiny" id="dataMeta"></div>
+          <div class="tiny">项目地址：<a id="lnkGitHub" href="https://github.com/MINGRENC0/genius-trader-simulator" target="_blank" rel="noopener" style="color:#4c8dff;text-decoration:none">GitHub</a> · 许可证 PolyForm Noncommercial 1.0.0（禁止商用）</div>
         </div>
 
         <div class="card">
@@ -2038,6 +2039,13 @@ function hideTip() {
 function bind() {
   $('#navA').onclick = () => {
     location.href = (window.matchMedia('(max-width:760px)').matches ? 'kline-mobile.html' : 'kline-training.html') + '?home=1';
+  };
+  const ghLink = $('#lnkGitHub');
+  if (ghLink) ghLink.onclick = e => {
+    e.preventDefault();
+    const url = ghLink.getAttribute('href');
+    if (window.KlineApp && window.KlineApp.openUrl) { window.KlineApp.openUrl(url); return; }
+    window.open(url, '_blank', 'noopener');
   };
   $('#btnRules').onclick = () => {
     const p = $('#rulesPanel');
