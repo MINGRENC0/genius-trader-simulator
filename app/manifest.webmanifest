@@ -1,0 +1,17 @@
+{
+  "name": "天才交易员模拟器",
+  "short_name": "天才交易员",
+  "description": "随机抽取真实 A 股历史 K 线，逐根盲测训练交易执行力",
+  "start_url": "./kline-mobile.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070a10",
+  "theme_color": "#070a10",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

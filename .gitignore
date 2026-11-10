@@ -1,0 +1,16 @@
+# 安装包与构建产物（体积大，不入库）
+dist/
+build/android/assets/
+build/android/build/
+build/desktop/build/
+*.apk
+*.exe
+
+# 本地缓存与分享包
+.screenshots/
+.trae-html-share-packages/
+.trae/
+
+# 系统文件
+Thumbs.db
+.DS_Store
