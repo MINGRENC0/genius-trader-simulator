@@ -1,4 +1,4 @@
-# K线训练营
+# 天才交易员模拟器
 
 真实 A 股 / 港股通 / ETF / 期货历史日 K 盲测交易训练器，纯前端页面 + 本地数据分片。
 
@@ -30,8 +30,8 @@ sw.js       PWA 离线缓存（仅 Web 端）
 ## 打包
 
 ```powershell
-python build/build_apk.py   # → dist/kline-camp.apk
-python build/build_exe.py   # → dist/K线训练营.exe
+python build/build_apk.py   # → dist/天才交易员模拟器.apk
+python build/build_exe.py   # → dist/天才交易员模拟器.exe
 ```
 
 ## 数据

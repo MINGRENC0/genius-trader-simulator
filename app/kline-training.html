@@ -887,6 +887,21 @@ function save(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* file:// 下可能被禁用 */ }
 }
 
+/* 战绩写入失败（配额不足）时逐级瘦身：先清交易明细/曲线，再丢最旧记录 */
+function saveStats() {
+  while (true) {
+    try { localStorage.setItem('klineCampStats', JSON.stringify(STATS)); return true; }
+    catch (e) {
+      let trimmed = false;
+      for (const rec of STATS) {
+        if (rec.trades && rec.trades.length) { rec.trades = []; trimmed = true; break; }
+        if (rec.eq && rec.eq.length) { rec.eq = []; trimmed = true; break; }
+      }
+      if (!trimmed) { if (!STATS.length) return false; STATS.shift(); }
+    }
+  }
+}
+
 let toastTimer = null;
 function toast(msg) {
   let el = $('#toast');
@@ -1113,7 +1128,7 @@ function getInd(sym) {
 }
 
 /* ================= 设置与记录 ================= */
-const APP_VER = '1.9.0';
+const APP_VER = '1.12.0';
 const BUILD_DATE = '2026-11-10';
 const GROUPS = [
   { key: '沪市主板', label: '沪主板' },
@@ -2314,7 +2329,7 @@ function finishRound() {
   }
   STATS.push(rec);
   if (STATS.length > 300) STATS.shift();
-  save('klineCampStats', STATS);
+  saveStats();
   clearRound();
   renderSummary(r, rec);
   showScreen('summary');
@@ -3972,7 +3987,7 @@ function bindEvents() {
     if (!STATS.length) { toast('还没有训练记录'); return; }
     if (await askConfirm('清空全部训练记录？此操作不可撤销。', '清空')) {
       STATS = [];
-      save('klineCampStats', STATS);
+      saveStats();
       renderStats();
       syncSettingsPage();
     }
@@ -3988,7 +4003,7 @@ function bindEvents() {
     if (!STATS.length) return;
     if (await askConfirm('清空全部训练记录？此操作不可撤销。', '清空')) {
       STATS = [];
-      save('klineCampStats', STATS);
+      saveStats();
       renderStats();
     }
   };

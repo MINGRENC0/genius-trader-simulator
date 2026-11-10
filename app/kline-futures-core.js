@@ -127,18 +127,21 @@
     lots = lots > 0 ? Math.min(Math.floor(lots), r.lots) : r.lots;
     if (!(lots > 0)) return { ok: false, error: '请输入平仓手数' };
     var pnl = (price - r.avg) * r.sym.mul * lots * r.dir;
+    var today = r.entryIdx === r.cur;
     var fee = feeOf(r, price, lots);
+    var extra = today ? price * r.sym.mul * lots * 0.0001 : 0; // 平今仓加收 0.01%
+    fee += extra;
     r.cash += pnl - fee;
     r.closed.push({
-      i: r.cur, dir: r.dir, lots: lots, pnl: pnl, fee: fee,
+      i: r.cur, dir: r.dir, lots: lots, pnl: pnl, fee: fee, today: today,
       hold: r.cur - (r.entryIdx == null ? r.cur : r.entryIdx), src: src || '手动'
     });
     r.orders.push({
-      i: r.cur, act: 'close', dir: r.dir, price: price, lots: lots, fee: fee, pnl: pnl, src: src || '手动'
+      i: r.cur, act: 'close', dir: r.dir, price: price, lots: lots, fee: fee, pnl: pnl, today: today, src: src || '手动'
     });
     r.lots -= lots;
     if (r.lots <= 0) { r.lots = 0; r.dir = 0; r.avg = 0; r.entryIdx = null; }
-    return { ok: true, act: 'close', lots: lots, fee: fee, pnl: pnl };
+    return { ok: true, act: 'close', lots: lots, fee: fee, extraFee: extra, pnl: pnl };
   }
 
   function checkForced(r, price) {
@@ -146,9 +149,11 @@
     var risk = riskOf(r, price);
     if (risk < 1) return null;
     var lots = r.lots;
-    closePos(r, price, lots, '强制平仓');
+    var slip = r.sym.tick || 0;
+    var px = Math.max(0.0001, price + (r.dir > 0 ? -slip : slip)); // 强平按对手价滑点 1 跳
+    closePos(r, px, lots, '强制平仓');
     r.forced = (r.forced || 0) + 1;
-    return { risk: risk, lots: lots };
+    return { risk: risk, lots: lots, price: px, slip: slip };
   }
 
   /* ---------------- 隔夜挂单 ---------------- */

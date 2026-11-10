@@ -286,8 +286,8 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
           <li><b>交易制度</b>：T+0 双向，可开多、开空、平仓；1 手起整数手。</li>
           <li><b>保证金</b>：按品种 8%~18%；保证金占用 = 价格 × 合约乘数 × 手数 × 保证金率；初始资金最低 3000 元。</li>
           <li><b>盈亏</b>：逐日盯市，权益 = 现金 + 浮动盈亏；平仓盈亏 =（平仓价 − 开仓均价）× 合约乘数 × 手数 × 方向。</li>
-          <li><b>风险与强平</b>：风险度 = 保证金占用 ÷ 权益；风险度 ≥ 100% 时强制平仓。</li>
-          <li><b>费用</b>：手续费 = 成交额 × 费率（首页可调），开仓、平仓均收取；无隔夜利息。</li>
+          <li><b>风险与强平</b>：风险度 = 保证金占用 ÷ 权益；风险度 ≥ 100% 时强制平仓，强平按对手价滑点 1 跳成交。</li>
+          <li><b>费用</b>：手续费 = 成交额 × 费率（首页可调），开仓、平仓均收取；当日开仓当日平仓加收 0.01% 平今手续费。</li>
           <li><b>隔夜挂单</b>：市价/限价 × 开多/开空/平仓；市价单按下一根开盘价成交，限价单触价成交，跳空按更优开盘价。</li>
           <li><b>数据</b>：30 个主力连续合约（商品 + 股指），2019 年以来日 K；盲测隐藏合约与日期。</li>
           <li><b>心理训练</b>：可开启隐藏剩余长度、传闻与噪音、延迟披露；传闻平均每 3 根一条，其中真假混杂，结算统一复盘。</li>
@@ -497,6 +497,10 @@ th{color:var(--muted2);font-weight:500;font-size:11px}
         <p id="sumRange">—</p>
       </div>
       <div class="metrics" id="metricGrid"></div>
+      <div class="card" style="margin-top:14px">
+        <div class="ct">K线复盘 · 买卖点还原</div>
+        <canvas id="sumChart"></canvas>
+      </div>
       <div class="card" style="margin-top:14px">
         <div class="ct">资金曲线 vs 标的涨跌</div>
         <canvas id="eqChart"></canvas>
@@ -1334,9 +1338,11 @@ function renderSummary(rec) {
       SUM_HL = Number(tr.dataset.i);
       $$('#tradeTable tbody tr').forEach(x => x.classList.toggle('on', x === tr));
       drawEqChart(rec);
+      drawSumK(rec);
     };
   });
   drawEqChart(rec);
+  drawSumK(rec);
   renderBehavior(rec);
   renderRumors(rec);
   renderSeasonCard(rec);
@@ -1464,7 +1470,89 @@ function drawEqChart(rec) {
   ctx.fillText('标的 ' + pct(rec.bh), padL + 90, padT + 10);
 }
 
-/* ================= 首页统计 ================= */
+function drawSumK(rec) {
+  const c = $('#sumChart');
+  if (!c) return;
+  const wrap = c.parentElement;
+  const W = wrap.clientWidth - 36, H = 240;
+  if (!(W > 10)) return;
+  const dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  c.style.width = W + 'px'; c.style.height = H + 'px';
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const sym = ALL.find(s => s.code === rec.code);
+  if (!sym || !sym.bars) return;
+  const bars = sym.bars, s = rec.si, e = rec.ei;
+  if (!(e - s >= 2)) return;
+  const padL = 8, padR = 58, padT = 12, padB = 16;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  let hi = -Infinity, lo = Infinity;
+  for (let i = s; i <= e; i++) { if (bars[i].h > hi) hi = bars[i].h; if (bars[i].l < lo) lo = bars[i].l; }
+  const pd = (hi - lo) * 0.06 || 1;
+  hi += pd; lo -= pd;
+  const n = e - s + 1, bw = plotW / n;
+  const xC = i => padL + (i - s + 0.5) * bw;
+  const y = v => padT + (hi - v) / (hi - lo) * plotH;
+  // 网格与价格
+  ctx.font = '9px -apple-system,"Microsoft YaHei",sans-serif';
+  ctx.textBaseline = 'middle';
+  for (let g = 0; g <= 3; g++) {
+    const v = lo + (hi - lo) * g / 3, yy = y(v);
+    ctx.strokeStyle = '#151d29';
+    ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL + plotW, yy); ctx.stroke();
+    ctx.fillStyle = '#6d7c90';
+    ctx.textAlign = 'left';
+    ctx.fillText(v >= 100 ? v.toFixed(0) : (v >= 10 ? v.toFixed(1) : v.toFixed(3)), padL + plotW + 6, yy);
+  }
+  // K线
+  const cw = Math.max(1, Math.min(bw * 0.68, 8));
+  for (let i = s; i <= e; i++) {
+    const b = bars[i], xx = xC(i);
+    const up = b.c >= b.o;
+    ctx.strokeStyle = ctx.fillStyle = up ? '#f6465d' : '#2ebd85';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(Math.round(xx) + 0.5, y(b.h)); ctx.lineTo(Math.round(xx) + 0.5, y(b.l)); ctx.stroke();
+    const top = y(Math.max(b.o, b.c)), bot = y(Math.min(b.o, b.c));
+    ctx.fillRect(xx - cw / 2, top, cw, Math.max(1, bot - top));
+  }
+  // 买卖点
+  (rec.trades || []).forEach(o => {
+    if (o.i < s || o.i > e) return;
+    const b = bars[o.i], xx = xC(o.i);
+    const buy = (o.act === 'open') === (o.dir > 0);
+    const yy = buy ? y(b.l) + 9 : y(b.h) - 9;
+    ctx.fillStyle = buy ? '#f6465d' : '#2ebd85';
+    ctx.beginPath();
+    if (buy) { ctx.moveTo(xx, yy - 5); ctx.lineTo(xx - 4, yy + 2); ctx.lineTo(xx + 4, yy + 2); }
+    else { ctx.moveTo(xx, yy + 5); ctx.lineTo(xx - 4, yy - 2); ctx.lineTo(xx + 4, yy - 2); }
+    ctx.closePath(); ctx.fill();
+  });
+  // 传闻发布点
+  (rec.rumorReview || []).forEach(x => {
+    if (x.i == null || x.i < s || x.i > e) return;
+    ctx.fillStyle = x.dir > 0 ? 'rgba(246,70,93,.9)' : (x.dir < 0 ? 'rgba(46,189,133,.9)' : 'rgba(138,151,170,.9)');
+    ctx.beginPath(); ctx.arc(xC(x.i), padT + plotH - 3, 2.2, 0, Math.PI * 2); ctx.fill();
+  });
+  // 流水定位
+  if (SUM_HL != null && SUM_HL >= s && SUM_HL <= e) {
+    const xx = xC(SUM_HL);
+    ctx.strokeStyle = 'rgba(76,141,255,.55)';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(xx, padT); ctx.lineTo(xx, padT + plotH); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // 日期
+  ctx.fillStyle = '#5a677b';
+  ctx.textBaseline = 'top';
+  [[s, 'left'], [Math.round((s + e) / 2), 'center'], [e, 'right']].forEach(([i, al]) => {
+    const xx = al === 'left' ? padL : (al === 'right' ? padL + plotW : xC(i));
+    ctx.textAlign = al;
+    ctx.fillText(bars[i].d.slice(2), xx, padT + plotH + 5);
+  });
+}
+
 function renderStats() {
   const n = STATS.length;
   const avg = n ? STATS.reduce((a, b) => a + b.ret, 0) / n : 0;
@@ -1808,6 +1896,7 @@ function drawChart() {
       const v = ma[k][hiIdx];
       const txt = (SET.maType === 'ema' ? 'E' : 'M') + k + ' ' + (v == null ? '--' : fmtPrice(v));
       ctx.fillStyle = colors[k];
+      if (lx + ctx.measureText(txt).width > W - padR) return;
       ctx.fillText(txt, lx, 8);
       lx += ctx.measureText(txt).width + 10;
     });
@@ -1816,6 +1905,7 @@ function drawChart() {
     let lx = padL;
     const put = (txt, color) => {
       ctx.fillStyle = color;
+      if (lx + ctx.measureText(txt).width > W - padR) return;
       ctx.fillText(txt, lx, SET.showMA ? 19 : 8);
       lx += ctx.measureText(txt).width + 10;
     };
@@ -2174,7 +2264,7 @@ function bind() {
   });
   window.addEventListener('resize', () => {
     if (R) { resize(); drawChart(); }
-    else if ($('#screen-summary').classList.contains('active') && SUM_REC) drawEqChart(SUM_REC);
+    else if ($('#screen-summary').classList.contains('active') && SUM_REC) { drawEqChart(SUM_REC); drawSumK(SUM_REC); }
   });
   window.addEventListener('pagehide', () => { if (R && !R.finished) KC_FUT.saveRound(R); });
   document.addEventListener('visibilitychange', () => {
